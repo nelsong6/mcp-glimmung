@@ -123,11 +123,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          az acr import \
-            --name romainecr \
-            --source "${REGISTRY}/${IMAGE}:${ALIAS_TAG}" \
-            --image "${IMAGE}:${{ steps.tag.outputs.tag }}" \
-            --force
+          docker buildx imagetools create \
+            --tag "${REGISTRY}/${IMAGE}:${{ steps.tag.outputs.tag }}" \
+            "${REGISTRY}/${IMAGE}:${ALIAS_TAG}"
 
       - name: Build and push image
         if: steps.image.outputs.target_exists != 'true' && steps.image.outputs.alias_exists != 'true'
