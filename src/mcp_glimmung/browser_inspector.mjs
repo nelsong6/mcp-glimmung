@@ -7,7 +7,11 @@ const require = createRequire(import.meta.url);
 const playwrightModule = pathToFileURL(
   process.env.PLAYWRIGHT_PACKAGE_PATH || require.resolve("playwright"),
 ).href;
-const { chromium } = await import(playwrightModule);
+const playwright = await import(playwrightModule);
+const chromium = playwright.chromium || playwright.default?.chromium;
+if (!chromium) {
+  throw new Error(`Unable to load Playwright Chromium from ${playwrightModule}`);
+}
 
 const input = JSON.parse(await new Promise((resolve, reject) => {
   let data = "";
