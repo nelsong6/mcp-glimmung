@@ -96,7 +96,6 @@ def test_list_issues_passes_filters_and_defaults_limit() -> None:
 
     tools["list_issues"](
         project="glimmung",
-        repo="nelsong6/glimmung",
         state="closed",
         limit=10,
     )
@@ -106,7 +105,6 @@ def test_list_issues_passes_filters_and_defaults_limit() -> None:
         "/v1/issues",
         {
             "project": "glimmung",
-            "repo": "nelsong6/glimmung",
             "state": "closed",
             "limit": 10,
         },
@@ -457,6 +455,35 @@ def test_resume_run_posts_native_step_boundary_payload() -> None:
             "actor": "codex",
         },
     }
+
+
+def test_checkout_test_slot_posts_checkout_payload() -> None:
+    tools, client = _registered_tools()
+
+    result = tools["checkout_test_slot"](
+        project="glimmung",
+        workflow="native-agent",
+        slot_index=2,
+        mode="clean_slate",
+        phase_inputs={"image_tag": "sha-123"},
+        ttl_seconds=3600,
+    )
+
+    assert result["path"] == "/v1/test-slots/checkout"
+    assert result["json"] == {
+        "project": "glimmung",
+        "mode": "clean_slate",
+        "workflow": "native-agent",
+        "slot_index": 2,
+        "phase_inputs": {"image_tag": "sha-123"},
+        "ttl_seconds": 3600,
+    }
+    assert client.calls[-1] == (
+        "POST",
+        "/v1/test-slots/checkout",
+        None,
+        result["json"],
+    )
 
 
 def test_get_native_run_events_calls_hot_log_surface() -> None:

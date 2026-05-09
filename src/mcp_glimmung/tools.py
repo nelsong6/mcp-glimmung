@@ -886,6 +886,41 @@ def register_tools(mcp: FastMCP, client: GlimmungClient) -> None:
         return client.post("/v1/runs/dispatch", json=payload)
 
     @mcp.tool()
+    def checkout_test_slot(
+        project: str,
+        workflow: str | None = None,
+        slot_index: int | None = None,
+        mode: str = "provision",
+        phase_inputs: dict[str, str] | None = None,
+        ttl_seconds: int | None = None,
+    ) -> dict[str, Any]:
+        """Reserve a Glimmung native app test slot.
+
+        Use this as a courtesy check-out when you need an ad-hoc app slot
+        but the actual provision/reset flow happens outside Glimmung. The
+        server records a native lease only; it does not create an Issue,
+        create a Run, or dispatch a workflow. `slot_index` selects a specific
+        `<project>-slot-N`; omit it to take the lowest available slot. `mode`
+        is `"provision"` for a normal checkout or `"clean_slate"` to record
+        that the caller intends to reset/re-apply the slot.
+
+        Extra `phase_inputs` are stored on the lease alongside
+        `validation_slot_index`, `test_slot_mode`, and `clean_slate`."""
+        payload: dict[str, Any] = {
+            "project": project,
+            "mode": mode,
+        }
+        if workflow is not None:
+            payload["workflow"] = workflow
+        if slot_index is not None:
+            payload["slot_index"] = slot_index
+        if phase_inputs is not None:
+            payload["phase_inputs"] = phase_inputs
+        if ttl_seconds is not None:
+            payload["ttl_seconds"] = ttl_seconds
+        return client.post("/v1/test-slots/checkout", json=payload)
+
+    @mcp.tool()
     def create_report(
         project: str,
         repo: str,
