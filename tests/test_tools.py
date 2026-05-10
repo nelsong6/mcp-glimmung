@@ -53,7 +53,6 @@ class StubTankClient:
         active: bool = True,
         slot_index: int | None = None,
         url: str | None = None,
-        lease_id: str | None = None,
     ) -> dict[str, Any]:
         self.calls.append(
             {
@@ -62,7 +61,6 @@ class StubTankClient:
                 "active": active,
                 "slot_index": slot_index,
                 "url": url,
-                "lease_id": lease_id,
             }
         )
         return {
@@ -71,7 +69,6 @@ class StubTankClient:
                 "active": active,
                 "slot_index": slot_index,
                 "url": url,
-                "lease_id": lease_id,
             }
             if active
             else None,
@@ -337,10 +334,16 @@ def test_dispatch_run_hides_backing_lease_id() -> None:
 
     client.post = fake_post  # type: ignore[method-assign]
 
-    result = tools["dispatch_run"]("issue-1", project="glimmung")
+    result = tools["dispatch_run"](issue_number=1, project="glimmung")
 
     assert result["lease"] == "claimed"
     assert "lease_id" not in result
+    assert client.calls[-1] == (
+        "POST",
+        "/v1/runs/dispatch",
+        None,
+        {"project": "glimmung", "issue_number": 1},
+    )
 
 
 def test_check_workflow_updates_calls_upstream_endpoint() -> None:
@@ -595,7 +598,7 @@ def test_checkout_test_slot_updates_tank_session_on_active_slot() -> None:
                 "workflow": "test-slot-checkout",
                 "slot_index": 2,
                 "slot_name": "tank-slot-2",
-                "lease_id": "lease-123",
+                "lease": "tank-slot-2",
             }
 
     client = CheckoutClient()
@@ -619,7 +622,6 @@ def test_checkout_test_slot_updates_tank_session_on_active_slot() -> None:
             "active": True,
             "slot_index": 2,
             "url": "https://tank-slot-2.tank.dev.romaine.life",
-            "lease_id": "lease-123",
         }
     ]
     assert result["lease"] == "tank-slot-2"
@@ -673,7 +675,6 @@ def test_return_test_slot_clears_tank_session_when_requested() -> None:
             "active": False,
             "slot_index": None,
             "url": None,
-            "lease_id": None,
         }
     ]
     assert result["tank_test_state"] is None

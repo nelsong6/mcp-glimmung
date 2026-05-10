@@ -992,8 +992,8 @@ def register_tools(
 
     @mcp.tool()
     def dispatch_run(
-        issue_id: str,
-        project: str | None = None,
+        issue_number: int,
+        project: str,
         workflow: str | None = None,
     ) -> dict[str, Any]:
         """Dispatch a Glimmung agent run for an issue and workflow.
@@ -1003,16 +1003,16 @@ def register_tools(
         the workflow's requirements, creates a Run, and fires the
         workflow_dispatch event or the first phase of a multi-phase workflow.
 
-        `issue_id` is the glimmung ULID (find via `get_issue` →
-        `id`). `project` is optional — the server resolves it from
-        the Issue doc when omitted. `workflow` is optional and only
-        needed if the project has more than one workflow registered.
+        `issue_number` is the project-scoped issue number, e.g.
+        `project="glimmung", issue_number=141`. `workflow` is optional and
+        only needed if the project has more than one workflow registered.
 
-        Returns the dispatch result: created Run id, claimed lease label,
+        Returns the dispatch result: created run number, claimed lease label,
         host, and the GHA workflow_dispatch outcome."""
-        payload: dict[str, Any] = {"issue_id": issue_id}
-        if project is not None:
-            payload["project"] = project
+        payload: dict[str, Any] = {
+            "project": project,
+            "issue_number": issue_number,
+        }
         if workflow is not None:
             payload["workflow"] = workflow
         return _hide_lease_id(client.post("/v1/runs/dispatch", json=payload))
@@ -1066,7 +1066,6 @@ def register_tools(
                 active=True,
                 slot_index=result.get("slot_index"),
                 url=_test_slot_url(result.get("slot_name")),
-                lease_id=result.get("lease_id"),
             )
         sanitized = _hide_lease_id(result)
         if tank_state is not None:
@@ -1079,7 +1078,6 @@ def register_tools(
         project: str,
         slot_index: int | None = None,
         slot_name: str | None = None,
-        lease_id: str | None = None,
         tank_session_id: str | None = None,
     ) -> dict[str, Any]:
         """Return a checked-out Glimmung native app test slot.
@@ -1087,16 +1085,13 @@ def register_tools(
         Returning a test slot tells Glimmung the caller no longer needs the
         leased environment. The server tears down the slot namespace for
         active test-slot checkouts, then releases the reservation. Use
-        `slot_index` or `slot_name` for normal MCP use; `lease_id` is an
-        escape hatch for callers that received the raw API response. Pass
-        `tank_session_id` to clear Tank's GUI test pill for the session."""
+        `slot_index` or `slot_name` for normal MCP use. Pass `tank_session_id`
+        to clear Tank's GUI test pill for the session."""
         payload: dict[str, Any] = {"project": project}
         if slot_index is not None:
             payload["slot_index"] = slot_index
         if slot_name is not None:
             payload["slot_name"] = slot_name
-        if lease_id is not None:
-            payload["lease_id"] = lease_id
         result = client.post("/v1/test-slots/return", json=payload)
         tank_state = None
         if tank_client is not None and tank_session_id is not None:
