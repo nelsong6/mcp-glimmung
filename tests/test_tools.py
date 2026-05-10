@@ -589,6 +589,7 @@ def test_checkout_test_slot_updates_tank_session_on_active_slot() -> None:
                 "workflow": "test-slot-checkout",
                 "slot_index": 2,
                 "slot_name": "tank-slot-2",
+                "url": "https://tank-slot-2.tank.dev.romaine.life",
                 "lease": "tank-slot-2",
             }
 
@@ -638,6 +639,7 @@ def test_checkout_test_slot_accepts_session_pod_name_for_tank_callback() -> None
                 "workflow": "test-slot-checkout",
                 "slot_index": 1,
                 "slot_name": "glimmung-1",
+                "url": "https://glimmung-1.glimmung.dev.romaine.life",
                 "lease": "glimmung-1",
             }
 
@@ -662,8 +664,83 @@ def test_checkout_test_slot_accepts_session_pod_name_for_tank_callback() -> None
     assert result["tank_session_url"] == "https://tank.example.test/?session=9190aa98a2"
 
 
+def test_checkout_test_slot_uses_server_returned_slot_url_for_tank_callback() -> None:
+    mcp = FakeMCP()
+    tank = StubTankClient()
+
+    class CheckoutClient(StubClient):
+        def post(
+            self,
+            path: str,
+            params: dict[str, Any] | None = None,
+            json: dict[str, Any] | None = None,
+        ) -> dict[str, Any]:
+            self.calls.append(("POST", path, params, json))
+            return {
+                "state": "active",
+                "project": "glimmung",
+                "workflow": "test-slot-checkout",
+                "slot_index": 1,
+                "slot_name": "glimmung-1",
+                "url": "https://glimmung-1.glimmung.dev.romaine.life",
+                "lease": "glimmung-1",
+            }
+
+    register_tools(mcp, CheckoutClient(), tank)  # type: ignore[arg-type]
+    from mcp_glimmung.caller import CALLER_POD_IP
+
+    token = CALLER_POD_IP.set("10.0.0.42")
+    try:
+        mcp.tools["checkout_test_slot"](
+            project="glimmung",
+            tank_session_id="9190aa98a2",
+        )
+    finally:
+        CALLER_POD_IP.reset(token)
+
+    assert tank.calls[0]["url"] == "https://glimmung-1.glimmung.dev.romaine.life"
+
+
 def test_checkout_test_slot_returns_lease_when_tank_callback_fails() -> None:
     mcp = FakeMCP()
+
+    class CheckoutClient(StubClient):
+        def post(
+            self,
+            path: str,
+            params: dict[str, Any] | None = None,
+            json: dict[str, Any] | None = None,
+        ) -> dict[str, Any]:
+            self.calls.append(("POST", path, params, json))
+            return {
+                "state": "active",
+                "project": "glimmung",
+                "workflow": "test-slot-checkout",
+                "slot_index": 1,
+                "slot_name": "glimmung-1",
+                "url": "https://glimmung-1.glimmung.dev.romaine.life",
+                "lease": "glimmung-1",
+            }
+
+    register_tools(mcp, CheckoutClient(), FailingTankClient())  # type: ignore[arg-type]
+    from mcp_glimmung.caller import CALLER_POD_IP
+
+    token = CALLER_POD_IP.set("10.0.0.42")
+    try:
+        result = mcp.tools["checkout_test_slot"](
+            project="glimmung",
+            tank_session_id="missing",
+        )
+    finally:
+        CALLER_POD_IP.reset(token)
+
+    assert result["lease"] == "glimmung-1"
+    assert "tank_test_state_error" in result
+
+
+def test_checkout_test_slot_reports_missing_server_url_without_guessing() -> None:
+    mcp = FakeMCP()
+    tank = StubTankClient()
 
     class CheckoutClient(StubClient):
         def post(
@@ -682,20 +759,16 @@ def test_checkout_test_slot_returns_lease_when_tank_callback_fails() -> None:
                 "lease": "glimmung-1",
             }
 
-    register_tools(mcp, CheckoutClient(), FailingTankClient())  # type: ignore[arg-type]
-    from mcp_glimmung.caller import CALLER_POD_IP
+    register_tools(mcp, CheckoutClient(), tank)  # type: ignore[arg-type]
 
-    token = CALLER_POD_IP.set("10.0.0.42")
-    try:
-        result = mcp.tools["checkout_test_slot"](
-            project="glimmung",
-            tank_session_id="missing",
-        )
-    finally:
-        CALLER_POD_IP.reset(token)
+    result = mcp.tools["checkout_test_slot"](
+        project="glimmung",
+        tank_session_id="9190aa98a2",
+    )
 
+    assert tank.calls == []
     assert result["lease"] == "glimmung-1"
-    assert "tank_test_state_error" in result
+    assert result["tank_test_state_error"] == "checkout response did not include a test slot url"
 
 
 def test_return_test_slot_posts_return_payload() -> None:

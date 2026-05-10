@@ -19,22 +19,12 @@ _CALLER_MISSING_MSG = (
     "could not identify caller from pod IP - make sure you're calling from "
     "inside a tank-operator session pod"
 )
-_TEST_SLOT_RECORD_BASE = os.environ.get(
-    "TEST_SLOT_RECORD_BASE", "tank.dev.romaine.life"
-).strip()
-
 
 def _pod_ip() -> str:
     ip = current_caller_pod_ip()
     if not ip:
         raise ValueError(_CALLER_MISSING_MSG)
     return ip
-
-
-def _test_slot_url(slot_name: str | None) -> str | None:
-    if not slot_name or not _TEST_SLOT_RECORD_BASE:
-        return None
-    return f"https://{slot_name}.{_TEST_SLOT_RECORD_BASE}"
 
 
 def _tank_session_id(value: str) -> str:
@@ -1029,16 +1019,20 @@ def register_tools(
             and result.get("state") == "active"
             and result.get("slot_index") is not None
         ):
-            try:
-                tank_state = tank_client.set_test_environment(
-                    _pod_ip(),
-                    session_id=normalized_tank_session_id,
-                    active=True,
-                    slot_index=result.get("slot_index"),
-                    url=_test_slot_url(result.get("slot_name")),
-                )
-            except (httpx.HTTPError, RuntimeError, ValueError) as exc:
-                tank_state = {"error": str(exc)}
+            slot_url = result.get("url")
+            if not isinstance(slot_url, str) or not slot_url:
+                tank_state = {"error": "checkout response did not include a test slot url"}
+            else:
+                try:
+                    tank_state = tank_client.set_test_environment(
+                        _pod_ip(),
+                        session_id=normalized_tank_session_id,
+                        active=True,
+                        slot_index=result.get("slot_index"),
+                        url=slot_url,
+                    )
+                except (httpx.HTTPError, RuntimeError, ValueError) as exc:
+                    tank_state = {"error": str(exc)}
         sanitized = _hide_lease_id(result)
         if tank_state is not None:
             if "error" in tank_state:
