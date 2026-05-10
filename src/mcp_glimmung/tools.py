@@ -1069,14 +1069,15 @@ def register_tools(
         base_ref: str = "main",
         head_sha: str = "",
         html_url: str = "",
-        linked_issue_id: str | None = None,
-        linked_run_id: str | None = None,
+        linked_issue_ref: str | None = None,
+        linked_run_ref: str | None = None,
     ) -> dict[str, Any]:
         """Create or register a Glimmung report for an existing GitHub pull request (PR).
 
         Use after creating a GitHub PR to link the PR back to Glimmung issue/run
-        state. Idempotent on `(repo, number)` and can attach `linked_issue_id` /
-        `linked_run_id` during either create or re-registration."""
+        state. Idempotent on `(repo, number)` and can attach public
+        `linked_issue_ref` / `linked_run_ref` values during either create or
+        re-registration."""
         payload: dict[str, Any] = {
             "project": project,
             "repo": repo,
@@ -1088,8 +1089,8 @@ def register_tools(
             "head_sha": head_sha,
             "html_url": html_url,
         }
-        if linked_issue_id is not None:
-            payload["linked_issue_id"] = linked_issue_id
-        if linked_run_id is not None:
-            payload["linked_run_id"] = linked_run_id
+        if linked_issue_ref is not None:
+            payload["linked_issue_ref"] = linked_issue_ref
+        if linked_run_ref is not None:
+            payload["linked_run_ref"] = linked_run_ref
         return client.post("/v1/reports", json=payload)
