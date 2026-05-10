@@ -203,32 +203,6 @@ def register_tools(
         return client.get(f"/v1/reports/{repo_owner}/{repo_name}/{pr_number}")
 
     @mcp.tool()
-    def get_report_by_id(project: str, report_id: str) -> dict[str, Any]:
-        """Get a Glimmung report by project and canonical Glimmung report id."""
-        return client.get(f"/v1/reports/by-id/{project}/{report_id}")
-
-    @mcp.tool()
-    def list_report_versions(
-        project: str,
-        report_id: str,
-        limit: int | None = 50,
-    ) -> list[dict[str, Any]]:
-        """List immutable Glimmung report snapshots for one report, newest first.
-
-        `limit` caps returned snapshots.
-        """
-        params = {"limit": limit}
-        return client.get(
-            f"/v1/reports/by-id/{project}/{report_id}/versions",
-            params={k: v for k, v in params.items() if v is not None},
-        )
-
-    @mcp.tool()
-    def get_report_version(project: str, report_id: str, version: int) -> dict[str, Any]:
-        """Get one immutable Glimmung report snapshot by integer version."""
-        return client.get(f"/v1/reports/by-id/{project}/{report_id}/versions/{version}")
-
-    @mcp.tool()
     def list_reports(
         project: str | None = None,
         repo: str | None = None,
@@ -969,22 +943,6 @@ def register_tools(
         )
 
     @mcp.tool()
-    def abort_run_by_id(
-        project: str,
-        run_id: str,
-        reason: str = "aborted_via_mcp",
-    ) -> dict[str, Any]:
-        """Abort a Glimmung run by internal ULID.
-
-        Prefer `abort_run(project, issue_number, run_number)` for normal
-        operator work. This is an escape hatch for storage-level recovery.
-        """
-        return client.post(
-            f"/v1/runs/{project}/{run_id}/abort",
-            params={"reason": reason},
-        )
-
-    @mcp.tool()
     def dispatch_run(
         issue_number: int,
         project: str,
@@ -1135,79 +1093,3 @@ def register_tools(
         if linked_run_id is not None:
             payload["linked_run_id"] = linked_run_id
         return client.post("/v1/reports", json=payload)
-
-    @mcp.tool()
-    def create_report_version(
-        project: str,
-        report_id: str,
-        title: str,
-        body: str = "",
-        state: str = "ready",
-        linked_run_id: str | None = None,
-        github_repo: str | None = None,
-        github_pr_number: int | None = None,
-        github_html_url: str | None = None,
-        version: int | None = None,
-    ) -> dict[str, Any]:
-        """Create an immutable snapshot for a Glimmung report.
-
-        Use after materially changing or syndicating a report to preserve the
-        exact title/body/state and GitHub linkage observed at that point in
-        time. If `version` is omitted, the server assigns the next integer.
-        """
-        payload: dict[str, Any] = {
-            "title": title,
-            "body": body,
-            "state": state,
-        }
-        for k, v in {
-            "linked_run_id": linked_run_id,
-            "github_repo": github_repo,
-            "github_pr_number": github_pr_number,
-            "github_html_url": github_html_url,
-            "version": version,
-        }.items():
-            if v is not None:
-                payload[k] = v
-        return client.post(
-            f"/v1/reports/by-id/{project}/{report_id}/versions",
-            json=payload,
-        )
-
-    @mcp.tool()
-    def patch_report(
-        project: str,
-        report_id: str,
-        title: str | None = None,
-        body: str | None = None,
-        branch: str | None = None,
-        base_ref: str | None = None,
-        head_sha: str | None = None,
-        html_url: str | None = None,
-        linked_issue_id: str | None = None,
-        linked_run_id: str | None = None,
-        state: str | None = None,
-        merged_by: str | None = None,
-    ) -> dict[str, Any]:
-        """Patch or update a Glimmung report linked to a GitHub pull request (PR).
-
-        Use to update report title, body, branch, base ref, head SHA, URL,
-        linked issue/run ids, state, or merged_by. All fields optional; None
-        means don't change.
-        """
-        payload: dict[str, Any] = {}
-        for k, v in {
-            "title": title,
-            "body": body,
-            "branch": branch,
-            "base_ref": base_ref,
-            "head_sha": head_sha,
-            "html_url": html_url,
-            "linked_issue_id": linked_issue_id,
-            "linked_run_id": linked_run_id,
-            "state": state,
-            "merged_by": merged_by,
-        }.items():
-            if v is not None:
-                payload[k] = v
-        return client.patch(f"/v1/reports/by-id/{project}/{report_id}", json=payload)

@@ -169,6 +169,7 @@ def test_project_scoped_issue_and_run_tools_call_human_id_surface() -> None:
     assert report["path"] == "/v1/projects/glimmung/issues/141/runs/1/report"
     assert abort["path"] == "/v1/projects/glimmung/issues/141/runs/1/abort"
     assert abort["params"] == {"reason": "stuck"}
+    assert "abort_run_by_id" not in tools
 
 
 def test_list_reports_passes_filters_and_defaults_limit() -> None:
@@ -232,42 +233,15 @@ def test_create_pr_posts_registration_payload() -> None:
     assert client.calls[-1] == ("POST", "/v1/reports", None, result["json"])
 
 
-def test_report_version_tools_call_http_surface() -> None:
+def test_raw_id_report_tools_are_not_registered() -> None:
     tools, client = _registered_tools()
 
-    listed = tools["list_report_versions"]("glimmung", "report-1")
-    one = tools["get_report_version"]("glimmung", "report-1", 2)
-    created = tools["create_report_version"](
-        project="glimmung",
-        report_id="report-1",
-        title="snapshot",
-        body="body",
-        state="needs_review",
-        linked_run_id="run-1",
-        github_repo="nelsong6/glimmung",
-        github_pr_number=123,
-        github_html_url="https://github.com/nelsong6/glimmung/pull/123",
-        version=2,
-    )
-
-    assert listed["path"] == "/v1/reports/by-id/glimmung/report-1/versions"
-    assert one["path"] == "/v1/reports/by-id/glimmung/report-1/versions/2"
-    assert created["path"] == "/v1/reports/by-id/glimmung/report-1/versions"
-    assert created["json"] == {
-        "title": "snapshot",
-        "body": "body",
-        "state": "needs_review",
-        "linked_run_id": "run-1",
-        "github_repo": "nelsong6/glimmung",
-        "github_pr_number": 123,
-        "github_html_url": "https://github.com/nelsong6/glimmung/pull/123",
-        "version": 2,
-    }
-    assert client.calls[-3:] == [
-        ("GET", "/v1/reports/by-id/glimmung/report-1/versions", {"limit": 50}, None),
-        ("GET", "/v1/reports/by-id/glimmung/report-1/versions/2", None, None),
-        ("POST", "/v1/reports/by-id/glimmung/report-1/versions", None, created["json"]),
-    ]
+    assert "get_report_by_id" not in tools
+    assert "list_report_versions" not in tools
+    assert "get_report_version" not in tools
+    assert "create_report_version" not in tools
+    assert "patch_report" not in tools
+    assert client.calls == []
 
 
 def test_project_and_workflow_list_tools_pass_filters_and_default_limits() -> None:
