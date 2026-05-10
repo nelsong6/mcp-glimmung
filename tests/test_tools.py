@@ -212,8 +212,8 @@ def test_create_pr_posts_registration_payload() -> None:
         number=123,
         title="MCP parity",
         branch="codex/mcp-parity",
-        linked_issue_id="issue-1",
-        linked_run_id="run-1",
+        linked_issue_ref="glimmung#123",
+        linked_run_ref="glimmung#123/runs/1",
     )
 
     assert result["path"] == "/v1/reports"
@@ -227,8 +227,8 @@ def test_create_pr_posts_registration_payload() -> None:
         "base_ref": "main",
         "head_sha": "",
         "html_url": "",
-        "linked_issue_id": "issue-1",
-        "linked_run_id": "run-1",
+        "linked_issue_ref": "glimmung#123",
+        "linked_run_ref": "glimmung#123/runs/1",
     }
     assert client.calls[-1] == ("POST", "/v1/reports", None, result["json"])
 
