@@ -1016,7 +1016,7 @@ def register_tools(
         tank_state = None
         if (
             tank_client is not None
-            and result.get("state") == "active"
+            and (result.get("lease_state") or result.get("state")) in {"active", "claimed"}
             and result.get("slot_index") is not None
         ):
             slot_url = result.get("url")
@@ -1041,6 +1041,27 @@ def register_tools(
                 sanitized["tank_test_state"] = tank_state.get("test_state")
                 sanitized["tank_session_url"] = tank_state.get("url")
         return sanitized
+
+    @mcp.tool()
+    def test_slot_status(
+        project: str,
+        slot_index: int | None = None,
+        slot_name: str | None = None,
+    ) -> dict[str, Any]:
+        """Poll a Glimmung native app test slot after checkout.
+
+        Use after `checkout_test_slot` returns a claimed lease with
+        `environment_state` set to `provisioning`. The lease is owned
+        immediately, but the slot environment becomes usable only when this
+        status response reports `environment_state: "ready"`. Pass either
+        `slot_index` or `slot_name`.
+        """
+        params: dict[str, Any] = {"project": project}
+        if slot_index is not None:
+            params["slot_index"] = slot_index
+        if slot_name is not None:
+            params["slot_name"] = slot_name
+        return _hide_lease_id(client.get("/v1/test-slots/status", params=params))
 
     @mcp.tool()
     def return_test_slot(

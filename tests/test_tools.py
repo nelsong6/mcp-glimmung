@@ -621,6 +621,57 @@ def test_checkout_test_slot_updates_tank_session_on_active_slot() -> None:
     assert result["tank_session_url"] == "https://tank.example.test/?session=abc123"
 
 
+def test_checkout_test_slot_updates_tank_session_on_claimed_slot() -> None:
+    mcp = FakeMCP()
+    tank = StubTankClient()
+
+    class CheckoutClient(StubClient):
+        def post(
+            self,
+            path: str,
+            params: dict[str, Any] | None = None,
+            json: dict[str, Any] | None = None,
+        ) -> dict[str, Any]:
+            self.calls.append(("POST", path, params, json))
+            return {
+                "state": "claimed",
+                "lease_state": "claimed",
+                "environment_state": "provisioning",
+                "project": "tank-operator",
+                "workflow": "test-slot-checkout",
+                "slot_index": 2,
+                "slot_name": "tank-slot-2",
+                "url": "https://tank-slot-2.tank.dev.romaine.life",
+                "lease": "tank-slot-2",
+            }
+
+    client = CheckoutClient()
+    register_tools(mcp, client, tank)  # type: ignore[arg-type]
+    from mcp_glimmung.caller import CALLER_POD_IP
+
+    token = CALLER_POD_IP.set("10.0.0.42")
+    try:
+        result = mcp.tools["checkout_test_slot"](
+            project="tank-operator",
+            tank_session_id="abc123",
+            slot_index=2,
+        )
+    finally:
+        CALLER_POD_IP.reset(token)
+
+    assert tank.calls == [
+        {
+            "caller_pod_ip": "10.0.0.42",
+            "session_id": "abc123",
+            "active": True,
+            "slot_index": 2,
+            "url": "https://tank-slot-2.tank.dev.romaine.life",
+        }
+    ]
+    assert result["environment_state"] == "provisioning"
+    assert result["tank_test_state"]["slot_index"] == 2
+
+
 def test_checkout_test_slot_accepts_session_pod_name_for_tank_callback() -> None:
     mcp = FakeMCP()
     tank = StubTankClient()
@@ -769,6 +820,23 @@ def test_checkout_test_slot_reports_missing_server_url_without_guessing() -> Non
     assert tank.calls == []
     assert result["lease"] == "glimmung-1"
     assert result["tank_test_state_error"] == "checkout response did not include a test slot url"
+
+
+def test_test_slot_status_gets_status_payload() -> None:
+    tools, client = _registered_tools()
+
+    result = tools["test_slot_status"](
+        project="tank-operator",
+        slot_index=3,
+    )
+
+    assert result["path"] == "/v1/test-slots/status"
+    assert client.calls[-1] == (
+        "GET",
+        "/v1/test-slots/status",
+        {"project": "tank-operator", "slot_index": 3},
+        None,
+    )
 
 
 def test_return_test_slot_posts_return_payload() -> None:
