@@ -259,7 +259,10 @@ def register_tools(
             active = [lease for lease in active if lease.get("project") == project]
             pending = [lease for lease in pending if lease.get("project") == project]
 
-        available_hosts = [h for h in hosts if not h.get("current_lease")]
+        available_hosts = [
+            h for h in hosts
+            if not h.get("current_lease") and not h.get("drained")
+        ]
 
         return {
             "available_hosts": available_hosts,

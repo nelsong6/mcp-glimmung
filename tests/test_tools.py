@@ -158,6 +158,32 @@ def test_list_issues_passes_filters_and_defaults_limit() -> None:
     )
 
 
+def test_list_leases_excludes_drained_hosts_from_available() -> None:
+    tools, client = _registered_tools()
+    client.responses[("GET", "/v1/state")] = {
+        "hosts": [
+            {
+                "name": "slot-1",
+                "capabilities": {"project": "tank-operator"},
+                "current_lease": None,
+                "drained": False,
+            },
+            {
+                "name": "slot-99",
+                "capabilities": {"project": "tank-operator"},
+                "current_lease": None,
+                "drained": True,
+            },
+        ],
+        "active_leases": [],
+        "pending_leases": [],
+    }
+
+    result = tools["list_leases"](project="tank-operator")
+
+    assert [host["name"] for host in result["available_hosts"]] == ["slot-1"]
+
+
 def test_list_issues_plain_call_caps_results() -> None:
     tools, client = _registered_tools()
 
