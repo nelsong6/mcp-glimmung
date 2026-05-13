@@ -187,6 +187,12 @@ def test_list_leases_excludes_drained_hosts_from_available() -> None:
                 "drained": False,
             },
             {
+                "name": "tank-operator-slot-1",
+                "capabilities": {"project": "tank-operator"},
+                "current_lease": None,
+                "drained": False,
+            },
+            {
                 "name": "slot-99",
                 "capabilities": {"project": "tank-operator"},
                 "current_lease": None,

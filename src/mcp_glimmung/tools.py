@@ -263,9 +263,16 @@ def register_tools(
             active = [lease for lease in active if lease.get("project") == project]
             pending = [lease for lease in pending if lease.get("project") == project]
 
+        test_slot_names = {
+            slot.get("slot_name")
+            for slot in test_slots
+            if isinstance(slot.get("slot_name"), str)
+        }
         available_hosts = [
             h for h in hosts
-            if not h.get("current_lease") and not h.get("drained")
+            if not h.get("current_lease")
+            and not h.get("drained")
+            and h.get("name") not in test_slot_names
         ]
 
         return {
