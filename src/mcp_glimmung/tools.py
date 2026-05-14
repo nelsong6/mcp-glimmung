@@ -4,6 +4,7 @@ Read surface plus session-safe mutations. Lease and webhook endpoints stay
 unexposed — those are runner / orchestrator concerns, not session concerns.
 """
 
+import logging
 import os
 from typing import Any
 
@@ -19,6 +20,8 @@ _CALLER_MISSING_MSG = (
     "could not identify caller from pod IP - make sure you're calling from "
     "inside a tank-operator session pod"
 )
+log = logging.getLogger(__name__)
+
 
 def _pod_ip() -> str:
     ip = current_caller_pod_ip()
@@ -1108,6 +1111,7 @@ def register_tools(
         slot_index: int | None = None,
         slot_name: str | None = None,
         tank_session_id: str | None = None,
+        reason: str | None = None,
     ) -> dict[str, Any]:
         """Return a checked-out Glimmung native app test slot.
 
@@ -1115,12 +1119,31 @@ def register_tools(
         leased environment. The server tears down the slot namespace for
         active test-slot checkouts, then releases the reservation. Use
         `slot_index` or `slot_name` for normal MCP use. Pass `tank_session_id`
-        to clear Tank's GUI test pill for the session."""
+        to clear Tank's GUI test pill for the session. Pass `reason` when the
+        return is administrative or otherwise non-obvious."""
         payload: dict[str, Any] = {"project": project}
         if slot_index is not None:
             payload["slot_index"] = slot_index
         if slot_name is not None:
             payload["slot_name"] = slot_name
+        caller_pod_ip = current_caller_pod_ip()
+        if caller_pod_ip:
+            payload["caller_pod_ip"] = caller_pod_ip
+        if tank_session_id is not None:
+            payload["caller_session_id"] = _tank_session_id(tank_session_id)
+        if reason is not None:
+            payload["reason"] = reason
+        payload["source"] = "mcp-glimmung.return_test_slot"
+        log.info(
+            "mcp tool return_test_slot project=%s slot_index=%s slot_name=%s "
+            "tank_session_id=%s caller_pod_ip=%s reason=%s",
+            project,
+            slot_index,
+            slot_name,
+            _tank_session_id(tank_session_id) if tank_session_id is not None else None,
+            caller_pod_ip,
+            reason,
+        )
         result = client.post("/v1/test-slots/return", json=payload)
         tank_state = None
         if tank_client is not None and tank_session_id is not None:
