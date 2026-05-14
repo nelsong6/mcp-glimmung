@@ -887,6 +887,7 @@ def test_return_test_slot_posts_return_payload() -> None:
         "project": "glimmung",
         "slot_index": 2,
         "slot_name": "glimmung-slot-2",
+        "source": "mcp-glimmung.return_test_slot",
     }
     assert client.calls[-1] == (
         "POST",
@@ -922,6 +923,8 @@ def test_return_test_slot_clears_tank_session_when_requested() -> None:
         }
     ]
     assert result["tank_test_state"] is None
+    assert result["json"]["caller_pod_ip"] == "10.0.0.42"
+    assert result["json"]["caller_session_id"] == "abc123"
 
 
 def test_get_native_run_events_calls_hot_log_surface() -> None:
