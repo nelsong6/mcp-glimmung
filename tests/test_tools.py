@@ -1021,6 +1021,67 @@ def test_get_native_run_events_calls_hot_log_surface() -> None:
     )
 
 
+def test_inspect_browser_url_resolves_lease_with_requester_metadata_shape() -> None:
+    """Real Glimmung lease shape for native-k8s test slots has
+    tank_session_id at requester.metadata.tank_session_id rather than
+    top-level metadata. Previously this resolved to "no active test-slot
+    lease" and broke every inspect_browser_url call from a session that
+    held a real checkout — see fix-inspect-lease-lookup.
+    """
+    import json
+
+    from mcp_glimmung import browser_inspector
+
+    tools, client = _registered_tools()
+    client.responses[("GET", "/v1/state")] = {
+        "active_leases": [
+            {
+                "ref": "tank-operator-slot-4",
+                "lease_number": 115,
+                "metadata": {
+                    "native_slot_name": "tank-operator-slot-4",
+                    "requester": {
+                        "consumer": "tank-operator",
+                        "kind": "tank_session",
+                        "label": "abc123",
+                        "metadata": {"tank_session_id": "abc123"},
+                        "ref": "tank-operator/session/abc123",
+                    },
+                },
+                "requester": {
+                    "consumer": "tank-operator",
+                    "kind": "tank_session",
+                    "label": "abc123",
+                    "metadata": {"tank_session_id": "abc123"},
+                    "ref": "tank-operator/session/abc123",
+                },
+                "playwright_ws_endpoint": "ws://slot-playwright.tank-operator-slot-4.svc.cluster.local:3000",
+            }
+        ]
+    }
+
+    class FakeCompleted:
+        returncode = 0
+        stdout = json.dumps({"schema_version": 2, "url": "https://example.test/"})
+        stderr = ""
+
+    def fake_run(*_args, **_kwargs):
+        return FakeCompleted()
+
+    import subprocess as _subprocess
+    monkey = pytest.MonkeyPatch()
+    try:
+        monkey.setattr(_subprocess, "run", fake_run)
+        result = tools["inspect_browser_url"](
+            url="https://example.test/",
+            tank_session_id="abc123",
+        )
+    finally:
+        monkey.undo()
+    assert result["url"] == "https://example.test/"
+    _ = browser_inspector
+
+
 def test_inspect_browser_url_errors_when_session_has_no_lease() -> None:
     tools, client = _registered_tools()
     client.responses[("GET", "/v1/state")] = {"active_leases": []}

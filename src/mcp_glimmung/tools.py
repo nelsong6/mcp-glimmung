@@ -122,10 +122,36 @@ def _resolve_slot_playwright_ws(client: GlimmungClient, tank_session_id: str) ->
     for lease in active_leases:
         if not isinstance(lease, dict):
             continue
+        # Glimmung exposes the tank session id at any of three places on
+        # the lease envelope, depending on how the lease was minted:
+        #   1. lease["metadata"]["tank_session_id"] — older flat shape
+        #   2. lease["metadata"]["requester"]["metadata"]["tank_session_id"]
+        #   3. lease["requester"]["metadata"]["tank_session_id"]
+        # (2) and (3) are what the native-k8s test-slot allocator writes
+        # today — (1) was never populated by checkout_test_slot, so the
+        # lookup found nothing and every inspect_browser_url call landed
+        # on the "no active test-slot lease" error path. Try all three
+        # in deterministic order; first non-empty match wins.
         metadata = lease.get("metadata") if isinstance(lease.get("metadata"), dict) else {}
+        nested_requester = metadata.get("requester") if isinstance(metadata.get("requester"), dict) else {}
+        nested_requester_md = (
+            nested_requester.get("metadata")
+            if isinstance(nested_requester.get("metadata"), dict)
+            else {}
+        )
+        top_requester = lease.get("requester") if isinstance(lease.get("requester"), dict) else {}
+        top_requester_md = (
+            top_requester.get("metadata")
+            if isinstance(top_requester.get("metadata"), dict)
+            else {}
+        )
         lease_session_id = (
             metadata.get("tank_session_id")
             or metadata.get("tankSessionId")
+            or nested_requester_md.get("tank_session_id")
+            or nested_requester_md.get("tankSessionId")
+            or top_requester_md.get("tank_session_id")
+            or top_requester_md.get("tankSessionId")
         )
         if lease_session_id != tank_session_id:
             continue
